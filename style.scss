@@ -5,7 +5,14 @@ body {
     padding: 0;
 }
 
+* {
+    box-sizing: border-box;
+}
+
+
+
 // Core.
+
 .carousel {
     overflow: hidden;
 }

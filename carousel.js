@@ -1,23 +1,32 @@
 /**
  * TODO:
  * ----
- * 1) 'Infinite' functionality should be configurable.
- * 2) Don't hard code the pagination.
- * 3) Autoplay?
- * 4) This relies on the browser supporting flexbox. What should we do for legacy browsers? :/
- * 5) touch/swipe support.
+ * 1) 'Infinite' functionality should be configurable, MAYBE? who even knows.
+ * 2) Autoplay?
+ * 3) This relies on the browser supporting flexbox. What should we do for legacy browsers? :/
+ * 4) touch/swipe support.
+ * 5) Pagination transition (e.g. going from 4 to 1) looks weird.
  */
 
 class Carousel {
-    constructor(carousel) {
+    constructor(carousel, options) {
         const selectors = {
             carousel: 'js-carousel',
             slide: 'js-carousel-slide',
             slideWrapper: 'js-carousel-slides',
-            nav: 'js-carousel-nav',
-            pagination: 'js-carousel-pagination'
+            nav: 'js-carousel-nav'
         };
 
+        // Define the default Carousel config options.
+        //
+        // 1. Delay (seconds) between slide transitions.
+        const defaults = {
+            pagination: true,
+            autoplay: true,
+            autoplayDelay: 5 // [1]
+        };
+
+        this.options = Object.assign({}, defaults, options);
         this.selectors = selectors;
 
         // Cache the carousel node.
@@ -31,7 +40,7 @@ class Carousel {
         this.slides = carousel.getElementsByClassName(this.selectors.slide);
 
         // If there isn't more than 1 slide then assuming we don't need
-        // a carousel.
+        // a carousel?
         if(this.slides.length < 2) {
             console.info('Carousel: Not enough slides. Exiting.');
             return;
@@ -40,11 +49,9 @@ class Carousel {
         // Cache the prev/next navigation nodes.
         this.navigation = carousel.getElementsByClassName(this.selectors.nav);
 
-        // Cache the pagination
-        this.pagination = carousel.getElementsByClassName(this.selectors.pagination);
-
         this.currentRef = this.slides.length - 1;
         this.currentIndex = 0;
+        this.timer = null;
 
         // Intialise the carousel.
         this.init();
@@ -64,11 +71,38 @@ class Carousel {
 
         this.setOrder();
         this.attachEvents();
+
+        if(this.options.pagination) {
+            this.buildPagination();
+        }
+
+        if(this.options.autoplay) {
+            this.startTimer();
+        }
+    }
+
+    /**
+     * Create the Pagination node, append it to the
+     * carousel and bind the click event for each one.
+     */
+    buildPagination() {
+        let ol = document.createElement('ol');
+        ol.classList.add('carousel-pagination');
+
+        this.carousel.appendChild(ol);
+
+        [].forEach.call(this.slides, (slide, index) => {
+            let li = document.createElement('li');
+            li.innerHTML = `<button data-index="${index}">${index + 1}</button>`;
+
+            li.addEventListener('click', () => this.paginate(index));
+
+            ol.appendChild(li);
+        });
     }
 
     /**
      * 1. Prev/Next click handler.
-     * 2. Slide Pagination click handler.
      */
     attachEvents() {
         // [1]
@@ -78,17 +112,6 @@ class Carousel {
 
                 let dir = e.currentTarget.getAttribute('data-dir');
                 this['move' + dir]();
-            });
-        });
-
-        // [2]
-        [].forEach.call(this.pagination, el => {
-            el.addEventListener('click', e => {
-                e.preventDefault();
-
-                let index = e.currentTarget.getAttribute('data-index');
-
-                this.paginate(index);
             });
         });
     }
@@ -117,6 +140,8 @@ class Carousel {
      * after the current one, move to that. If not, go to the first.
      */
     moveNext() {
+        this.stopTimer();
+
         let next = this.currentIndex + 1;
         let index = this.slides[next] ? next : 0;
 
@@ -130,6 +155,8 @@ class Carousel {
      * before the current one, move to that. If not, move to the last.
      */
     movePrev() {
+        this.stopTimer();
+
         let prev = this.currentIndex - 1;
         let index = this.slides[prev] ? prev : this.slides.length - 1;
 
@@ -156,6 +183,7 @@ class Carousel {
 
         setTimeout(() => {
             this.slideWrapper.classList.add('push');
+            this.slideChanged();
         }, 50);
     }
 
@@ -171,5 +199,33 @@ class Carousel {
         }
 
         this.moveToIndex(i, (i < this.currentIndex ? 'prev' : 'next'));
+    }
+
+    /**
+     * Called after the slide has changed (and the transition is complete -
+     * I think).
+     */
+    slideChanged() {
+        if(this.options.autoplay) {
+            this.startTimer();
+        }
+    }
+
+    /**
+     * Start the autoplay timeout. This should be called after a slide
+     * has been changed.
+     */
+    startTimer() {
+        this.timer = window.setTimeout(() => {
+            this.moveNext();
+        }, this.options.autoplayDelay * 1000);
+    }
+
+    /**
+     * Reset/Clear the autoplay timeout. This should be called before
+     * a slide is changed, I think!
+     */
+    stopTimer() {
+         window.clearTimeout(this.timer);
     }
 }
